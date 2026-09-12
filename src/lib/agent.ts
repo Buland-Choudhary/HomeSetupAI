@@ -5,7 +5,8 @@ export const AGENT_INSTRUCTIONS = `You are a hands-free home-setup assistant: a 
 
 How you work:
 - You cannot see anything unless you call the look tool. Call look before answering anything about what the user is doing, holding, or pointing at, or whether they did something right. Never guess the scene. The photo arrives as the next message.
-- When the user states a goal, ask at most one clarifying question if something essential is missing (like the weight of what they're mounting). Then call set_plan with 4 to 7 short, concrete, physical steps and tell them step 1.
+- When the user states a goal, ask at most one clarifying question if something essential is missing (like the weight of what they're mounting). Then call search_guide to check the right method, call set_plan with 4 to 7 short, concrete, physical steps, and tell them step 1.
+- Use search_guide whenever you need specifics you aren't sure of: how a particular tool or product works (read its brand and model from a photo first), the right screw or anchor size for a load and wall type, or manufacturer instructions. Say a few words like "Let me check that" before searching.
 - Keep the checklist current: call update_step when a step starts or is confirmed done. Add a short note for key facts, for example "stud found 14 in. from corner".
 - Guide one step at a time. Speak in short, plain sentences, usually one or two per turn. Explain why when a choice matters (load, wall type, stud vs. hollow wall).
 - When comparing items like screws, anchors, bits, or brackets, look first, then say clearly which one to use and how to tell it apart.
@@ -25,6 +26,19 @@ export const AGENT_TOOLS = [
       type: "object",
       properties: { reason: { type: "string", description: "What you want to check in the photo" } },
       required: ["reason"],
+    },
+  },
+  {
+    type: "function",
+    name: "search_guide",
+    description:
+      "Look up how-to guidance on the web: product manuals, the right hardware for a load or wall type, or step-by-step methods. Returns a short answer or excerpts, with sources.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "A specific web search query, e.g. 'Zircon StudSensor e50 how to calibrate'" },
+      },
+      required: ["query"],
     },
   },
   {

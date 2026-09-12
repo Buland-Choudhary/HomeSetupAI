@@ -69,8 +69,8 @@ Commit and push at the end of every milestone, then redeploy (`npx vercel deploy
 | # | Time (EDT) | Milestone | Done when |
 |---|---|---|---|
 | M0 | ✅ 12:18 | Setup check, keys, deploy, repo | All phone checks pass (done) |
-| **M1** | 12:40–1:20 | **Agent core**: move the setup check to `/check`; new `/` = full-screen camera, big Start button, speaking indicator, checklist panel. Token route carries real instructions and tool schemas. Function-call dispatcher. `look`, `set_plan`, `update_step`. | On the phone: "I want to hang a shelf" → the agent makes a checklist; "what do you see?" → the agent calls `look` and describes the scene |
-| **M2** | 1:20–1:50 | **Web lookup**: `/api/search` (web_search with forced search; Exa if key) + `search_guide` tool; the agent uses it at kickoff and for "how do I use this stud finder?" | Spoken answer grounded in a lookup (visible in debug log) |
+| **M1** ✅ deployed 12:33 (awaiting phone test) | 12:40–1:20 | **Agent core**: move the setup check to `/check`; new `/` = full-screen camera, big Start button, speaking indicator, checklist panel. Token route carries real instructions and tool schemas. Function-call dispatcher. `look`, `set_plan`, `update_step`. | On the phone: "I want to hang a shelf" → the agent makes a checklist; "what do you see?" → the agent calls `look` and describes the scene |
+| **M2** ✅ built 12:42 (search ~4–5s, grounded with sources) | 1:20–1:50 | **Web lookup**: `/api/search` (web_search with forced search; Exa if key) + `search_guide` tool; the agent uses it at kickoff and for "how do I use this stud finder?" | Spoken answer grounded in a lookup (visible in debug log) |
 | **M3** | 1:50–2:30 | **Watcher**: frame-diff gate, `/api/watch` with JSON schema, the rules for speaking up, `step_done` → `update_step` | Agent speaks up unprompted when a step is visibly done or something's wrong |
 | **M4** | 2:30–2:55 | **Marked-up snapshot**: `/api/annotate` with grid overlay → circles, arrows and lines with labels drawn over the photo; `mark_up` tool | "Which screw should I use?" → the photo shows that screw circled |
 | 🧊 | **2:55** | **Feature freeze** | — |

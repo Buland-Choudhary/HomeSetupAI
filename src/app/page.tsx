@@ -31,6 +31,7 @@ export default function AgentPage() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [showLog, setShowLog] = useState(false);
+  const [activity, setActivity] = useState<string | null>(null);
 
   useEffect(() => {
     // The screen wake lock is dropped whenever the page is hidden, so take it again on return.
@@ -76,6 +77,22 @@ export default function AgentPage() {
       );
       commitPlan({ ...current, steps });
       return { output: { ok: true } };
+    },
+    search_guide: async ({ query }) => {
+      if (typeof query !== "string" || !query.trim()) throw new Error("search_guide needs a query.");
+      setActivity(`Looking up: ${query}`);
+      try {
+        const res = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error ?? `Search failed (${res.status})`);
+        return { output: result };
+      } finally {
+        setActivity(null);
+      }
     },
   };
 
@@ -157,6 +174,11 @@ export default function AgentPage() {
         </div>
       </div>
 
+      {activity && (
+        <p className="absolute inset-x-3 top-14 z-10 rounded-lg bg-sky-400/95 px-3 py-2 text-sm font-medium text-black">
+          🔎 {activity}
+        </p>
+      )}
       {showLog ? (
         <ol className="absolute inset-x-3 top-14 max-h-[40dvh] overflow-y-auto whitespace-pre-wrap rounded-lg bg-black/80 p-2 font-mono text-[11px] leading-snug">
           {log.length === 0 ? <li className="text-zinc-400">No events yet</li> : log.map((line, i) => <li key={i}>{line}</li>)}
