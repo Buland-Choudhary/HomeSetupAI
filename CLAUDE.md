@@ -2,7 +2,7 @@
 
 # Hackathon project — AI Tinkerers NYC "Agents, Everywhere"
 
-Project decisions: @PROJECT.md · API details: @TECH_NOTES.md
+Project decisions: @PROJECT.md · Build plan & milestones: @plan.md · API details: @TECH_NOTES.md
 
 This folder is a hackathon build for the **AI Tinkerers "Agents, Everywhere" global hackathon (with OpenAI)**, Sat **2026-09-12**, NYC (venue: Veris AI). Full event details: @HACKATHON.md
 

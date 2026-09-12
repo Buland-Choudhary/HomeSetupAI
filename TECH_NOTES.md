@@ -51,4 +51,23 @@ await exa.answer("question"); // .answer, with citations
 node 24, npm 11, python 3.12, uv, docker, gh (logged in as Buland-Choudhary). No gcloud, ngrok or cloudflared. No API keys in env.
 Phone camera/mic access needs **HTTPS**, so deploy the app or use a tunnel for testing on a phone.
 
-Sources: developers.openai.com/api/docs/guides/realtime-conversations, /voice-webrtc?api=realtime; exa.ai/docs/sdks/javascript-sdk; github.com/webrtcHacks/gpt-realtime-webrtc
+## Verified 12:30 PM against this account
+- Models available include `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-live-1`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.4-mini`, `gpt-5.4-nano`.
+- Phone test passed: camera, mic, Realtime voice, and Realtime `input_image` (768px JPEG over the data channel) on the user's phone.
+- **Watcher latency** (Responses API, one 768×432 image, JSON reply, single samples):
+  - terra `effort:low` 1.9s
+  - luna `effort:low` 2.2s
+  - luna `effort:none` 3.0s
+  - GPT-5.6 models accept effort `none|low|medium|high|xhigh|max`; `minimal` returns a 400.
+- **OpenAI web search** (`tools:[{type:"web_search", search_context_size:"low"}]`): luna 2.3s, terra 2.7s, good answers, but **0 `url_citation` annotations**, so the model likely answered without searching. Force a search when grounding matters.
+  - Citations live in `output[type=message].content[].annotations[type=url_citation]` (`url`, `title`).
+  - Domain filters: `filters: { allowed_domains: [...] }`.
+
+## Realtime function calling
+- Server side: `response.done` has an output item `{type:"function_call", name, arguments (JSON string), call_id}`. `response.function_call_arguments.delta` also streams.
+- Return a result with `conversation.item.create` → `item:{type:"function_call_output", call_id, output: JSON string}`, then send `response.create`.
+- Output transcript events: `response.output_audio_transcript.delta` / `.done`.
+- Cancel: `response.cancel`; on WebRTC also send `output_audio_buffer.clear`.
+- Out-of-band response (kept out of the conversation): `response.create` with `response.conversation: "none"`.
+
+Sources: developers.openai.com/api/docs/guides/realtime-conversations, /voice-webrtc?api=realtime, /models, /tools-web-search; exa.ai/docs/sdks/javascript-sdk; github.com/webrtcHacks/gpt-realtime-webrtc

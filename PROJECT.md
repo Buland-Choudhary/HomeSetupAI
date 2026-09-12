@@ -40,7 +40,8 @@ Demo story/mounted item, which mistake to stage for the watcher, how to record t
 ## Status
 - 12:18 PM: setup check page deployed to **https://home-setup-agent.vercel.app** (Vercel project `home-setup-agent`, team buland-choudharys-projects). `OPENAI_API_KEY` is set in Vercel production and `.env.local`, and `gpt-realtime-2.1` is confirmed available. No Exa key yet.
 - Redeploy: `npx vercel deploy --prod --yes`. Local dev: `npm run dev` (`.claude/launch.json` → "web").
-- GitHub repo not created yet; waiting for the user's OK.
+- 12:30 PM: all phone checks passed (camera, mic, voice, vision). Repo https://github.com/Buland-Choudhary/HomeSetupAI (public), pushed over SSH. OpenRouter credits were offered but deliberately not used.
+- 12:35 PM: build plan written in `plan.md`.
 
 ## Open questions
 - Team size and who builds what; preferred language/stack
