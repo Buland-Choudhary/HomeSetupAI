@@ -1,4 +1,8 @@
 const REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+// Push-to-talk: presses shorter than this are treated as accidental, and the mic stays open
+// briefly after release so the end of the last word still reaches the server.
+const MIN_TALK_MS = 250;
+const TALK_TAIL_MS = 300;
 
 export type ServerEvent = { type: string; [key: string]: unknown };
 export type ToolResult = { output: unknown; image?: string };
@@ -18,9 +22,12 @@ type Callbacks = {
 export class RealtimeSession {
   private pc: RTCPeerConnection | null = null;
   private dc: RTCDataChannel | null = null;
+  private mic: MediaStreamTrack | null = null;
   private agentSpeaking = false;
   private userSpeaking = false;
   private responding = false;
+  private pushToTalk = false;
+  private talkStartedAt = 0;
 
   constructor(
     private tools: Record<string, ToolHandler>,
@@ -48,6 +55,7 @@ export class RealtimeSession {
         this.callbacks.onClose?.(`Connection ${pc.connectionState}`);
       }
     };
+    this.mic = mic;
     pc.addTrack(mic);
 
     const dc = pc.createDataChannel("oai-events");
@@ -73,14 +81,51 @@ export class RealtimeSession {
 
   // Adds a message from the app (not the user's voice), optionally with a photo, and has the agent respond.
   sendAppMessage(text: string, image?: string) {
-    if (this.agentSpeaking) this.interrupt();
+    this.interrupt();
     this.send({ type: "conversation.item.create", item: userMessage(text, image) });
     this.send({ type: "response.create" });
   }
 
+  // Stops the agent mid-reply: cancels generation and drops audio that hasn't played yet.
   interrupt() {
-    this.send({ type: "response.cancel" });
-    this.send({ type: "output_audio_buffer.clear" });
+    if (this.responding) this.send({ type: "response.cancel" });
+    if (this.agentSpeaking) this.send({ type: "output_audio_buffer.clear" });
+  }
+
+  // Push-to-talk turns off automatic turn detection, and the mic only sends audio while the talk button is held.
+  setPushToTalk(enabled: boolean, handsFreeTurnDetection: Record<string, unknown>) {
+    this.pushToTalk = enabled;
+    if (this.mic) this.mic.enabled = !enabled;
+    this.send({
+      type: "session.update",
+      session: { type: "realtime", audio: { input: { turn_detection: enabled ? null : handsFreeTurnDetection } } },
+    });
+  }
+
+  startTalking() {
+    if (!this.pushToTalk || !this.mic) return;
+    this.interrupt();
+    this.send({ type: "input_audio_buffer.clear" });
+    this.mic.enabled = true;
+    this.talkStartedAt = Date.now();
+    this.setUserSpeaking(true);
+  }
+
+  stopTalking() {
+    if (!this.pushToTalk || !this.talkStartedAt) return;
+    const heldMs = Date.now() - this.talkStartedAt;
+    this.talkStartedAt = 0;
+    this.setUserSpeaking(false);
+    setTimeout(() => {
+      if (this.talkStartedAt) return; // A new press already started; it cleared this audio.
+      if (this.mic && this.pushToTalk) this.mic.enabled = false;
+      if (heldMs < MIN_TALK_MS) {
+        this.send({ type: "input_audio_buffer.clear" });
+        return;
+      }
+      this.send({ type: "input_audio_buffer.commit" });
+      this.send({ type: "response.create" });
+    }, TALK_TAIL_MS);
   }
 
   close() {
@@ -102,8 +147,7 @@ export class RealtimeSession {
         break;
       case "input_audio_buffer.speech_started":
       case "input_audio_buffer.speech_stopped":
-        this.userSpeaking = event.type === "input_audio_buffer.speech_started";
-        this.callbacks.onUserSpeaking?.(this.userSpeaking);
+        this.setUserSpeaking(event.type === "input_audio_buffer.speech_started");
         break;
       case "response.created":
         this.responding = true;
@@ -118,6 +162,11 @@ export class RealtimeSession {
   private setAgentSpeaking(speaking: boolean) {
     this.agentSpeaking = speaking;
     this.callbacks.onAgentSpeaking?.(speaking);
+  }
+
+  private setUserSpeaking(speaking: boolean) {
+    this.userSpeaking = speaking;
+    this.callbacks.onUserSpeaking?.(speaking);
   }
 
   // Runs every function call in a finished response, returns the results, then lets the agent continue.

@@ -6,6 +6,7 @@ import { ActivityFeed, formatClock, type Activity } from "@/components/ActivityF
 import { Captions } from "@/components/Captions";
 import { Checklist, type Plan, type StepStatus } from "@/components/Checklist";
 import { MarkedPhoto, type Mark } from "@/components/MarkedPhoto";
+import { AGENT_AUDIO_INPUT } from "@/lib/agent";
 import { captureFrame, frameDifference, frameSignature, type Frame } from "@/lib/frames";
 import { RealtimeSession, type ToolHandler } from "@/lib/realtime";
 import { playShutter } from "@/lib/shutter";
@@ -44,8 +45,10 @@ export default function AgentPage() {
   const planRef = useRef<Plan | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const pushToTalkRef = useRef(false);
 
-  const { activities, userCaption, agentCaption, addActivity, updateActivity, handleServerEvent } = useConversation();
+  const { activities, userCaption, agentCaption, setUserCaption, addActivity, updateActivity, handleServerEvent } =
+    useConversation();
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [agentSpeaking, setAgentSpeaking] = useState(false);
@@ -54,6 +57,8 @@ export default function AgentPage() {
   const [markup, setMarkup] = useState<(Frame & { marks: Mark[] }) | null>(null);
   const [primary, setPrimary] = useState<Screen>("camera");
   const [watching, setWatching] = useState(true);
+  const [pushToTalk, setPushToTalk] = useState(false);
+  const [talking, setTalking] = useState(false);
   const [watchStats, setWatchStats] = useState<{ checks: number; lastAt: number | null }>({ checks: 0, lastAt: null });
 
   useEffect(() => {
@@ -112,12 +117,17 @@ export default function AgentPage() {
 
         // The check took a moment, so make sure nobody started talking in the meantime.
         const cooledDown = Date.now() - lastAlertAt > WATCH_ALERT_COOLDOWN_MS;
-        const relay = !session.busy && cooledDown && verdict.message !== lastAlert;
+        const spoken = !pushToTalkRef.current;
+        const relay = spoken && !session.busy && cooledDown && verdict.message !== lastAlert;
         const summary = verdict.event === "mistake" ? "Possible mistake" : `Step ${verdict.step} looks done`;
         addActivity({
           kind: "watcher",
           text: `${summary}: ${verdict.message}`,
-          detail: relay ? "Told the assistant" : "Held back (someone was talking, or it just alerted)",
+          detail: relay
+            ? "Told the assistant"
+            : spoken
+              ? "Held back (someone was talking, or it just alerted)"
+              : "Not spoken (push-to-talk mode)",
           image: frame.url,
         });
         if (!relay) return;
@@ -272,6 +282,7 @@ export default function AgentPage() {
         onOpen: () => {
           setStatus("live");
           addActivity({ kind: "system", text: "Connected and listening" });
+          if (pushToTalkRef.current) session.setPushToTalk(true, AGENT_AUDIO_INPUT.turn_detection);
           session.send({ type: "response.create" });
         },
         onClose: (reason) => {
@@ -303,24 +314,44 @@ export default function AgentPage() {
     setStatus("idle");
     setAgentSpeaking(false);
     setUserSpeaking(false);
+    setTalking(false);
     addActivity({ kind: "system", text: "Session ended" });
   }
 
-  function lookNow() {
-    const frame = captureFrame(videoRef.current);
-    if (!frame || !sessionRef.current) return;
-    playShutter(audioCtxRef.current);
-    addActivity({ kind: "photo", text: "You tapped Look now", image: frame.url });
-    sessionRef.current.sendAppMessage(
-      "[app] The user tapped Look now. Here is the current photo. Tell them what you notice about their progress and what to do next.",
-      frame.url,
-    );
+  function changeMode(enabled: boolean) {
+    pushToTalkRef.current = enabled;
+    setPushToTalk(enabled);
+    sessionRef.current?.setPushToTalk(enabled, AGENT_AUDIO_INPUT.turn_detection);
+    addActivity({ kind: "system", text: enabled ? "Switched to push-to-talk" : "Switched to hands-free" });
+  }
+
+  function startTalking() {
+    if (!sessionRef.current) return;
+    sessionRef.current.startTalking();
+    setTalking(true);
+    setUserCaption("Listening…");
+  }
+
+  function stopTalking() {
+    if (!talking) return;
+    sessionRef.current?.stopTalking();
+    setTalking(false);
   }
 
   const swap = () => setPrimary((screen) => (screen === "camera" ? "details" : "camera"));
   const cameraIsPrimary = primary === "camera";
   const statusLabel =
-    status !== "live" ? STATUS_LABELS[status] : agentSpeaking ? "Speaking" : userSpeaking ? "Hearing you" : "Listening";
+    status !== "live"
+      ? STATUS_LABELS[status]
+      : talking
+        ? "Recording… release to send"
+        : agentSpeaking
+          ? "Speaking"
+          : userSpeaking
+            ? "Hearing you"
+            : pushToTalk
+              ? "Hold the button to talk"
+              : "Listening";
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-black text-white">
@@ -380,14 +411,30 @@ export default function AgentPage() {
         {error && <p className="text-sm text-red-400">{error}</p>}
         <Captions status={statusLabel} user={userCaption} agent={agentCaption} />
         {status === "live" ? (
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={lookNow} className="h-14 rounded-xl bg-white font-semibold text-black">
-              Look now
-            </button>
-            <button onClick={end} className="h-14 rounded-xl bg-zinc-800 font-semibold">
-              End
-            </button>
-          </div>
+          <>
+            {pushToTalk && (
+              <button
+                onPointerDown={startTalking}
+                onPointerUp={stopTalking}
+                onPointerLeave={stopTalking}
+                onPointerCancel={stopTalking}
+                onContextMenu={(e) => e.preventDefault()}
+                className={`h-20 touch-none select-none rounded-2xl text-lg font-semibold [-webkit-touch-callout:none] ${
+                  talking ? "bg-red-500 text-white" : "bg-white text-black"
+                }`}
+              >
+                {talking ? "Release to send" : "Hold to talk"}
+              </button>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => changeMode(!pushToTalk)} className="h-12 rounded-xl bg-zinc-800 text-sm font-semibold">
+                {pushToTalk ? "Mode: 🎙 Push-to-talk" : "Mode: 🗣 Hands-free"}
+              </button>
+              <button onClick={end} className="h-12 rounded-xl bg-zinc-800 text-sm font-semibold">
+                End
+              </button>
+            </div>
+          </>
         ) : (
           <button
             onClick={start}

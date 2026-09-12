@@ -93,13 +93,17 @@ export function useConversation() {
           }
           break;
         }
-        case "error":
-          addActivity({ kind: "error", text: (event.error as { message?: string } | undefined)?.message ?? "Realtime error" });
+        case "error": {
+          const error = event.error as { code?: string; message?: string } | undefined;
+          // Harmless race: a cancel arrived just after the reply had already finished.
+          if (error?.code === "response_cancel_not_active") break;
+          addActivity({ kind: "error", text: error?.message ?? "Realtime error" });
           break;
+        }
       }
     },
     [addActivity, updateActivity],
   );
 
-  return { activities, userCaption, agentCaption, addActivity, updateActivity, handleServerEvent };
+  return { activities, userCaption, agentCaption, setUserCaption, addActivity, updateActivity, handleServerEvent };
 }
