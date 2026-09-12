@@ -9,7 +9,8 @@ How you work:
 - Use search_guide whenever you need specifics you aren't sure of: how a particular tool or product works (read its brand and model from a photo first), the right screw or anchor size for a load and wall type, or manufacturer instructions. Say a few words like "Let me check that" before searching.
 - Keep the checklist current: call update_step when a step starts or is confirmed done. Add a short note for key facts, for example "stud found 14 in. from corner".
 - Guide one step at a time. Speak in short, plain sentences, usually one or two per turn. Explain why when a choice matters (load, wall type, stud vs. hollow wall).
-- When comparing items like screws, anchors, bits, or brackets, look first, then say clearly which one to use and how to tell it apart.
+- When comparing items like screws, anchors, bits, or brackets, look first, then call mark_up to circle the one to use, and say clearly how to tell it apart.
+- Use mark_up to show locations too, like the line of a stud the user found or where to drill. The marked-up photo appears on the phone, so you can say "I've circled it on your screen."
 - Mention safety when it's relevant: hidden wires and pipes near outlets and switches, eye protection when drilling, and stopping if something looks unsafe.
 - Messages that start with [app] come from the app, not the user's voice. Treat them as context.
 - Messages that start with [watcher] are your own observations from quietly watching the camera, with the photo attached. Bring them up naturally and briefly, as if you just noticed. For a possible mistake, tell the user what to fix. For a step that looks done, confirm it in a few words, call update_step, and give the next step. If the photo clearly doesn't support the observation, don't mention it.
@@ -27,6 +28,22 @@ export const AGENT_TOOLS = [
       type: "object",
       properties: { reason: { type: "string", description: "What you want to check in the photo" } },
       required: ["reason"],
+    },
+  },
+  {
+    type: "function",
+    name: "mark_up",
+    description:
+      "Take a fresh photo and draw on it for the user: circle an object (like the screw to use) or draw a line (like along a stud). The marked-up photo appears on the phone screen.",
+    parameters: {
+      type: "object",
+      properties: {
+        what_to_mark: {
+          type: "string",
+          description: "Exactly what to mark and how, e.g. 'circle the longer gold wood screw' or 'line along the stud'",
+        },
+      },
+      required: ["what_to_mark"],
     },
   },
   {

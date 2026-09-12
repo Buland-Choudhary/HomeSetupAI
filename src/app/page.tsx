@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Checklist, type Plan, type StepStatus } from "@/components/Checklist";
-import { captureFrame, frameDifference, frameSignature } from "@/lib/frames";
+import { MarkedPhoto, type Mark } from "@/components/MarkedPhoto";
+import { captureFrame, frameDifference, frameSignature, type Frame } from "@/lib/frames";
 import { RealtimeSession, type ServerEvent, type ToolHandler } from "@/lib/realtime";
 
 type Status = "idle" | "starting" | "live" | "error";
@@ -41,6 +42,7 @@ export default function AgentPage() {
   const [showLog, setShowLog] = useState(false);
   const [activity, setActivity] = useState<string | null>(null);
   const [watching, setWatching] = useState(true);
+  const [markup, setMarkup] = useState<(Frame & { marks: Mark[] }) | null>(null);
 
   useEffect(() => {
     // The screen wake lock is dropped whenever the page is hidden, so take it again on return.
@@ -123,6 +125,7 @@ export default function AgentPage() {
       const frame = captureFrame(videoRef.current);
       if (!frame) throw new Error("The camera isn't ready.");
       setPhoto(frame.url);
+      setMarkup(null);
       return { output: { ok: true, note: "Photo attached in the next message." }, image: frame.url };
     },
     set_plan: ({ goal, steps }) => {
@@ -143,6 +146,26 @@ export default function AgentPage() {
       );
       commitPlan({ ...current, steps });
       return { output: { ok: true } };
+    },
+    mark_up: async ({ what_to_mark: what }) => {
+      if (typeof what !== "string" || !what.trim()) throw new Error("mark_up needs what_to_mark.");
+      const frame = captureFrame(videoRef.current);
+      if (!frame) throw new Error("The camera isn't ready.");
+      setActivity(`Marking up: ${what}`);
+      try {
+        const res = await fetch("/api/annotate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: frame.url, request: what }),
+        });
+        const result = (await res.json()) as { marks?: Mark[]; note?: string; error?: string };
+        if (!res.ok) throw new Error(result.error ?? `Mark-up failed (${res.status})`);
+        const marks = result.marks ?? [];
+        setMarkup({ ...frame, marks });
+        return { output: { shownOnScreen: marks.map((m) => m.label), note: result.note } };
+      } finally {
+        setActivity(null);
+      }
     },
     search_guide: async ({ query }) => {
       if (typeof query !== "string" || !query.trim()) throw new Error("search_guide needs a query.");
@@ -252,6 +275,10 @@ export default function AgentPage() {
         <ol className="absolute inset-x-3 top-14 max-h-[40dvh] overflow-y-auto whitespace-pre-wrap rounded-lg bg-black/80 p-2 font-mono text-[11px] leading-snug">
           {log.length === 0 ? <li className="text-zinc-400">No events yet</li> : log.map((line, i) => <li key={i}>{line}</li>)}
         </ol>
+      ) : markup ? (
+        <div className="absolute inset-x-3 top-14">
+          <MarkedPhoto {...markup} onClose={() => setMarkup(null)} />
+        </div>
       ) : (
         photo && (
           // eslint-disable-next-line @next/next/no-img-element -- data URL snapshot

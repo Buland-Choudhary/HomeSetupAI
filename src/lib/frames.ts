@@ -1,4 +1,4 @@
-export type Frame = { url: string; kb: number };
+export type Frame = { url: string; kb: number; width: number; height: number };
 
 // Grabs the current video frame as a JPEG data URL, downscaled so it stays small enough for the data channel.
 export function captureFrame(video: HTMLVideoElement | null, maxWidth = 768): Frame | null {
@@ -9,7 +9,7 @@ export function captureFrame(video: HTMLVideoElement | null, maxWidth = 768): Fr
   canvas.height = Math.round(video.videoHeight * scale);
   canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
   const url = canvas.toDataURL("image/jpeg", 0.7);
-  return { url, kb: Math.round((url.length * 3) / 4 / 1024) };
+  return { url, kb: Math.round((url.length * 3) / 4 / 1024), width: canvas.width, height: canvas.height };
 }
 
 const SIGNATURE_WIDTH = 32;

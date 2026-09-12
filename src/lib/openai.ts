@@ -20,6 +20,44 @@ export async function mintRealtimeSecret(session: Record<string, unknown>) {
   return { ok: true as const, value: data.value, expiresAt: data.expires_at };
 }
 
+// One Responses API call with an image whose reply must match a JSON schema. Returns the parsed reply.
+export async function structuredVisionResponse<T>(options: {
+  model: string;
+  instructions: string;
+  text: string;
+  image: string;
+  schemaName: string;
+  schema: Record<string, unknown>;
+  timeoutMs: number;
+}): Promise<T> {
+  const res = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: options.model,
+      reasoning: { effort: "low" },
+      text: { format: { type: "json_schema", name: options.schemaName, strict: true, schema: options.schema } },
+      instructions: options.instructions,
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: options.text },
+            { type: "input_image", image_url: options.image },
+          ],
+        },
+      ],
+    }),
+    signal: AbortSignal.timeout(options.timeoutMs),
+  });
+  if (!res.ok) throw new Error(await errorDetail(res));
+
+  const data = (await res.json()) as { output?: { type: string; content?: { text?: string }[] }[] };
+  const text = data.output?.filter((o) => o.type === "message").flatMap((o) => o.content ?? []).map((c) => c.text ?? "").join("");
+  if (!text) throw new Error("empty model reply");
+  return JSON.parse(text) as T;
+}
+
 // Readable error text from a failed API response, with anything key-like scrubbed
 // because these messages can reach a public page.
 export async function errorDetail(res: Response) {

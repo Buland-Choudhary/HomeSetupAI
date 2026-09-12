@@ -1,4 +1,4 @@
-import { errorDetail } from "@/lib/openai";
+import { structuredVisionResponse } from "@/lib/openai";
 
 const WATCH_MODEL = "gpt-5.6-terra";
 const TIMEOUT_MS = 10_000;
@@ -39,31 +39,16 @@ export async function POST(request: Request) {
     : "No plan yet.";
 
   try {
-    const res = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: WATCH_MODEL,
-        reasoning: { effort: "low" },
-        text: { format: { type: "json_schema", name: "watcher_verdict", strict: true, schema: VERDICT_SCHEMA } },
-        instructions: WATCH_INSTRUCTIONS,
-        input: [
-          {
-            role: "user",
-            content: [
-              { type: "input_text", text: `Goal: ${goal}\nPlan:\n${planText}\n\nYour last alert: ${lastMessage || "none"}` },
-              { type: "input_image", image_url: image },
-            ],
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+    const verdict = await structuredVisionResponse({
+      model: WATCH_MODEL,
+      instructions: WATCH_INSTRUCTIONS,
+      text: `Goal: ${goal}\nPlan:\n${planText}\n\nYour last alert: ${lastMessage || "none"}`,
+      image,
+      schemaName: "watcher_verdict",
+      schema: VERDICT_SCHEMA,
+      timeoutMs: TIMEOUT_MS,
     });
-    if (!res.ok) return Response.json({ error: await errorDetail(res) }, { status: 502 });
-
-    const data = (await res.json()) as { output?: { type: string; content?: { text?: string }[] }[] };
-    const text = data.output?.filter((o) => o.type === "message").flatMap((o) => o.content ?? []).map((c) => c.text ?? "").join("");
-    return Response.json(JSON.parse(text || "{}"));
+    return Response.json(verdict);
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : String(err) }, { status: 502 });
   }
