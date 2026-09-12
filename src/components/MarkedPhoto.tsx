@@ -8,13 +8,15 @@ export function MarkedPhoto({
   width,
   height,
   marks,
+  compact = false,
   onClose,
 }: {
   url: string;
   width: number;
   height: number;
   marks: Mark[];
-  onClose: () => void;
+  compact?: boolean;
+  onClose?: () => void;
 }) {
   const size = Math.max(width, height);
   const radius = size * 0.05;
@@ -24,7 +26,11 @@ export function MarkedPhoto({
   return (
     <div className="relative mx-auto w-fit overflow-hidden rounded-xl border-2 border-amber-300 shadow-2xl">
       {/* eslint-disable-next-line @next/next/no-img-element -- data URL snapshot */}
-      <img src={url} alt="Photo marked up by the assistant" className="block max-h-[45dvh] w-auto max-w-full" />
+      <img
+        src={url}
+        alt="Photo marked up by the assistant"
+        className={`block w-auto max-w-full ${compact ? "max-h-48" : "max-h-[40dvh]"}`}
+      />
       <svg viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 h-full w-full">
         {marks.map((mark, i) => {
           const x = mark.x * width;
@@ -56,13 +62,15 @@ export function MarkedPhoto({
           );
         })}
       </svg>
-      <button
-        onClick={onClose}
-        className="absolute right-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-sm"
-        aria-label="Close marked-up photo"
-      >
-        ✕
-      </button>
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="absolute right-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-sm"
+          aria-label="Close marked-up photo"
+        >
+          ✕
+        </button>
+      )}
       {marks.length === 0 && (
         <p className="absolute inset-x-0 bottom-0 bg-black/70 p-2 text-sm">Couldn&apos;t find that in the photo.</p>
       )}
