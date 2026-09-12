@@ -4,6 +4,8 @@ A hands-free AI helper for home setup jobs. Prop your phone up so the camera see
 
 Built at the AI Tinkerers **"Agents, Everywhere"** hackathon (NYC, Sept 12, 2026).
 
+> **Status:** hackathon prototype, no longer hosted or maintained. The team continued with a teammate's project. To try it, run it locally (see below).
+
 ## Why it has to live in the room
 Hands full of screws and a stud finder is the worst time to type into a chatbot. This agent runs where the work is happening:
 - **It sees the job.** It checks the camera before answering "am I doing this right?" instead of guessing.
@@ -45,7 +47,7 @@ Camera and mic need HTTPS on phones, so deploy (e.g. `npx vercel deploy`) or use
 
 ## Built with
 - **OpenAI**: Realtime API (voice + vision + tools) and Responses API (web search, structured vision)
-- Next.js 16, TypeScript, Tailwind CSS, deployed on Vercel
+- Next.js 16, TypeScript, Tailwind CSS (hosted on Vercel during the event)
 
 ## Built during the hackathon
 Everything in this repo was written on Sept 12, 2026 during the event. The commit history shows the progression: setup check → agent core → web lookup → watcher → photo markup.

@@ -1,5 +1,7 @@
 # Build plan — Home Setup Agent (working title)
 
+> **Status: wrapped up.** The team moved to a friend's project. The Vercel deployment has been taken down, so the links below are historical.
+
 Written 2026-09-12 12:35 PM EDT. **Build ends 3:30 PM · planned submission 3:30–4:00 · hard portal cutoff 4:30 PM.**
 Decisions come from [PROJECT.md](PROJECT.md); API details and measurements are in [TECH_NOTES.md](TECH_NOTES.md).
 
