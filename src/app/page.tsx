@@ -358,6 +358,7 @@ export default function AgentPage() {
                   {watchStats.checks} quiet checks{watchStats.lastAt ? ` · last ${formatClock(watchStats.lastAt)}` : ""}
                 </span>
                 <Link href="/check">Setup check</Link>
+                <span>Build {process.env.NEXT_PUBLIC_BUILD_LABEL}</span>
               </div>
             </div>
             <section className="mt-4 rounded-xl border border-zinc-800 p-3">
