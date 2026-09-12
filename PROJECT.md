@@ -42,6 +42,7 @@ Demo story/mounted item, which mistake to stage for the watcher, how to record t
 - Redeploy: `npx vercel deploy --prod --yes`. Local dev: `npm run dev` (`.claude/launch.json` → "web").
 - 12:30 PM: all phone checks passed (camera, mic, voice, vision). Repo https://github.com/Buland-Choudhary/HomeSetupAI (public), pushed over SSH. OpenRouter credits were offered but deliberately not used.
 - 12:35 PM: build plan written in `plan.md`.
+- 12:43 PM: M1–M4 built and deployed (agent core, web lookup, watcher, photo markup). Only M0 has been confirmed on the phone so far. Vercel↔GitHub auto-deploy failed (the Vercel GitHub app likely isn't installed), so deploys are manual.
 
 ## Open questions
 - Team size and who builds what; preferred language/stack
