@@ -19,11 +19,18 @@ export class RealtimeSession {
   private pc: RTCPeerConnection | null = null;
   private dc: RTCDataChannel | null = null;
   private agentSpeaking = false;
+  private userSpeaking = false;
+  private responding = false;
 
   constructor(
     private tools: Record<string, ToolHandler>,
     private callbacks: Callbacks,
   ) {}
+
+  // True while either side is talking or a response is still being generated.
+  get busy() {
+    return this.agentSpeaking || this.userSpeaking || this.responding;
+  }
 
   async connect(mic: MediaStreamTrack, speaker: HTMLAudioElement) {
     const tokenRes = await fetch("/api/realtime-token", { method: "POST" });
@@ -94,12 +101,15 @@ export class RealtimeSession {
         this.setAgentSpeaking(false);
         break;
       case "input_audio_buffer.speech_started":
-        this.callbacks.onUserSpeaking?.(true);
-        break;
       case "input_audio_buffer.speech_stopped":
-        this.callbacks.onUserSpeaking?.(false);
+        this.userSpeaking = event.type === "input_audio_buffer.speech_started";
+        this.callbacks.onUserSpeaking?.(this.userSpeaking);
+        break;
+      case "response.created":
+        this.responding = true;
         break;
       case "response.done":
+        this.responding = false;
         await this.runFunctionCalls(event);
         break;
     }

@@ -3,10 +3,18 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Checklist, type Plan, type StepStatus } from "@/components/Checklist";
-import { captureFrame } from "@/lib/frames";
+import { captureFrame, frameDifference, frameSignature } from "@/lib/frames";
 import { RealtimeSession, type ServerEvent, type ToolHandler } from "@/lib/realtime";
 
 type Status = "idle" | "starting" | "live" | "error";
+type WatchVerdict = { event: "none" | "mistake" | "step_done"; step: number | null; message: string };
+
+// Watcher pacing: look every few seconds, but only call the model when the scene changed
+// (or it's been a while), and never speak up more often than the cooldown allows.
+const WATCH_TICK_MS = 3_000;
+const WATCH_CHANGE_THRESHOLD = 0.03;
+const WATCH_MAX_IDLE_MS = 15_000;
+const WATCH_ALERT_COOLDOWN_MS = 10_000;
 
 const STEP_STATUSES: StepStatus[] = ["todo", "doing", "done"];
 const STATUS_LABELS: Record<Exclude<Status, "live">, string> = {
@@ -32,6 +40,7 @@ export default function AgentPage() {
   const [log, setLog] = useState<string[]>([]);
   const [showLog, setShowLog] = useState(false);
   const [activity, setActivity] = useState<string | null>(null);
+  const [watching, setWatching] = useState(true);
 
   useEffect(() => {
     // The screen wake lock is dropped whenever the page is hidden, so take it again on return.
@@ -46,6 +55,63 @@ export default function AgentPage() {
       void wakeLockRef.current?.release();
     };
   }, []);
+
+  useEffect(() => {
+    if (status !== "live" || !watching) return;
+    const appendLog = (line: string) => setLog((prev) => [line, ...prev].slice(0, 40));
+    let lastSignature: Uint8Array | null = null;
+    let lastCheckAt = 0;
+    let lastAlertAt = 0;
+    let lastAlert = "";
+    let inFlight = false;
+
+    const timer = setInterval(async () => {
+      const session = sessionRef.current;
+      const plan = planRef.current;
+      if (!session || !plan || inFlight || session.busy) return;
+
+      const signature = frameSignature(videoRef.current);
+      if (!signature) return;
+      const changed = !lastSignature || frameDifference(signature, lastSignature) > WATCH_CHANGE_THRESHOLD;
+      if (!changed && Date.now() - lastCheckAt < WATCH_MAX_IDLE_MS) return;
+      const frame = captureFrame(videoRef.current, 512);
+      if (!frame) return;
+
+      inFlight = true;
+      lastSignature = signature;
+      lastCheckAt = Date.now();
+      try {
+        const res = await fetch("/api/watch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: frame.url, goal: plan.goal, steps: plan.steps, lastMessage: lastAlert }),
+        });
+        const verdict = (await res.json()) as WatchVerdict & { error?: string };
+        if (!res.ok) {
+          appendLog(`watcher ⚠ ${verdict.error}`);
+          return;
+        }
+        appendLog(`watcher: ${verdict.event}${verdict.message ? ` – ${verdict.message}` : ""}`);
+
+        // The check took a moment, so make sure nobody started talking in the meantime.
+        const cooledDown = Date.now() - lastAlertAt > WATCH_ALERT_COOLDOWN_MS;
+        if (verdict.event === "none" || session.busy || !cooledDown || verdict.message === lastAlert) return;
+        lastAlert = verdict.message;
+        lastAlertAt = Date.now();
+        session.sendAppMessage(
+          verdict.event === "mistake"
+            ? `[watcher] Possible mistake: ${verdict.message}`
+            : `[watcher] Step ${verdict.step} looks done: ${verdict.message}`,
+          frame.url,
+        );
+      } catch (err) {
+        appendLog(`watcher ⚠ ${describeError(err)}`);
+      } finally {
+        inFlight = false;
+      }
+    }, WATCH_TICK_MS);
+    return () => clearInterval(timer);
+  }, [status, watching]);
 
   function commitPlan(next: Plan) {
     planRef.current = next;
@@ -169,6 +235,9 @@ export default function AgentPage() {
       <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 bg-gradient-to-b from-black/70 to-transparent p-3">
         <StatusPill status={status} agentSpeaking={agentSpeaking} userSpeaking={userSpeaking} />
         <div className="flex gap-4 text-xs text-zinc-300">
+          <button onClick={() => setWatching((v) => !v)} className={watching ? "text-emerald-300" : undefined}>
+            {watching ? "👁 Watching" : "Watcher off"}
+          </button>
           <button onClick={() => setShowLog((v) => !v)}>{showLog ? "Hide log" : "Log"}</button>
           <Link href="/check">Setup check</Link>
         </div>
